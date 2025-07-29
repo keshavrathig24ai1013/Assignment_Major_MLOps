@@ -1,88 +1,100 @@
 import numpy as np
-from utils import load_model, quantize_to_uint8, dequantize_from_uint8, quantize_to_uint8_individual, dequantize_from_uint8_individual
 import joblib
 import os
 
+from utils import (
+    load_model,
+    load_dataset,
+    quantize_to_uint8,
+    quantize_to_uint8_individual,
+    dequantize_from_uint8,
+    dequantize_from_uint8_individual
+)
+
 def main():
-    print("Loading trained model.")
+    print("Loading the trained linear regression model...")
     model = load_model("models/linear_regression_model.joblib")
 
-    coef = model.coef_
-    intercept = model.intercept_
+    weights = model.coef_
+    bias = model.intercept_
 
-    print(f"Original coefficients shape is : {coef.shape}")
-    print(f"Original intercept is : {intercept}")
-    print(f"Original coef values is : {coef}")
+    print(f"Model weight shape: {weights.shape}")
+    print(f"Model intercept: {bias}")
+    print(f"Model weights: {weights}")
 
-    raw_params = {
-        'coef': coef,
-        'intercept': intercept
+    # Save unquantized parameters
+    raw_parameters = {
+        "coef": weights,
+        "intercept": bias
     }
     os.makedirs("models", exist_ok=True)
-    joblib.dump(raw_params, "models/unquant_params.joblib")
+    joblib.dump(raw_parameters, "models/unquant_params.joblib")
 
-    quant_coef, coef_metadata = quantize_to_uint8_individual(coef)
+    # Quantize model weights
+    q_weights, weight_metadata = quantize_to_uint8_individual(weights)
 
-    print(f"\n Quantizing intercept.")
-    print(f"Intercept value: {intercept:.8f}")
-    quant_intercept, int_min, int_max, int_scale = quantize_to_uint8(np.array([intercept]))
-    print(f"Intercept scale factor: {int_scale:.2f}")
+    # Quantize intercept
+    print("\nQuantizing intercept...")
+    q_bias_array, min_val, max_val, scale = quantize_to_uint8(np.array([bias]))
+    q_bias = q_bias_array[0]
+    print(f"Intercept scale: {scale:.4f}")
 
-    quant_params = {
-        'quant_coef': quant_coef,
-        'coef_metadata': coef_metadata,
-        'quant_intercept': quant_intercept[0],
-        'int_min': int_min,
-        'int_max': int_max,
-        'int_scale': int_scale
+    # Store quantized parameters
+    quantized_params = {
+        "quant_coef": q_weights,
+        "coef_metadata": weight_metadata,
+        "quant_intercept": q_bias,
+        "int_min": min_val,
+        "int_max": max_val,
+        "int_scale": scale
     }
-    joblib.dump(quant_params, "models/quant_params.joblib")
+    joblib.dump(quantized_params, "models/quant_params.joblib")
     print("Quantized parameters saved to models/quant_params.joblib")
 
-    dequant_coef = dequantize_from_uint8_individual(quant_coef, coef_metadata)
-    dequant_intercept_array = dequantize_from_uint8(np.array([quant_params['quant_intercept']]), int_min, int_max,
-                                                    int_scale)
-    dequant_intercept = dequant_intercept_array[0]
+    # Dequantize weights and intercept
+    dq_weights = dequantize_from_uint8_individual(q_weights, weight_metadata)
+    dq_bias = dequantize_from_uint8(np.array([q_bias]), min_val, max_val, scale)[0]
 
-    coef_error = np.abs(coef - dequant_coef).max()
-    intercept_error = np.abs(intercept - dequant_intercept)
-    print(f"Max coefficient error: {coef_error:.8f}")
-    print(f"Intercept error: {intercept_error:.8f}")
+    # Compare errors
+    coef_error = np.max(np.abs(weights - dq_weights))
+    bias_error = np.abs(bias - dq_bias)
+    print(f"Maximum weight error after dequantization: {coef_error:.8f}")
+    print(f"Intercept error after dequantization: {bias_error:.8f}")
 
-    from utils import load_dataset
+    # Perform inference comparison
     X_train, X_test, y_train, y_test = load_dataset()
+    x_sample = X_test[:1]
 
-    test_sample = X_test[0:1] 
+    pred_sklearn = model.predict(x_sample)[0]
+    pred_manual = np.dot(x_sample[0], weights) + bias
+    pred_dequant = np.dot(x_sample[0], dq_weights) + dq_bias
 
-    original_pred_single = model.predict(test_sample)[0]
-    manual_original = np.dot(test_sample[0], coef) + intercept
-    manual_dequant = np.dot(test_sample[0], dequant_coef) + dequant_intercept
-    original_pred = model.predict(X_test[:10])
-    manual_original_pred = X_test[:10] @ coef + intercept
-    manual_dequant_pred = X_test[:10] @ dequant_coef + dequant_intercept
+    preds_sklearn = model.predict(X_test[:10])
+    preds_manual = X_test[:10] @ weights + bias
+    preds_dequant = X_test[:10] @ dq_weights + dq_bias
 
-    print("\n Inference Test (the first 10 samples are..):")
-    print("Original predictions (sklearn):", original_pred)
-    print("Manual original predictions:   ", manual_original_pred)
-    print("Manual dequant predictions:    ", manual_dequant_pred)
+    print("\nInference Results (first 10 samples):")
+    print("Predictions (sklearn):", preds_sklearn)
+    print("Manual predictions (original weights):", preds_manual)
+    print("Manual predictions (dequantized weights):", preds_dequant)
 
-    print("\n Differences:")
-    print("Sklearn vs manual original:", np.abs(original_pred - manual_original_pred))
-    print("Original vs dequant manual: ", np.abs(manual_original_pred - manual_dequant_pred))
+    print("\nPrediction Differences:")
+    print("Sklearn vs Manual Original:", np.abs(preds_sklearn - preds_manual))
+    print("Original vs Dequantized Manual:", np.abs(preds_manual - preds_dequant))
 
-    original_vs_dequant_diff = np.abs(original_pred - manual_dequant_pred)
-    print("Absolute differences:", original_vs_dequant_diff)
-    print("Max difference:", original_vs_dequant_diff.max())
-    print("Mean difference:", original_vs_dequant_diff.mean())
+    diffs = np.abs(preds_sklearn - preds_dequant)
+    print("Absolute differences:", diffs)
+    print("Max difference:", diffs.max())
+    print("Mean difference:", diffs.mean())
 
-    max_diff = original_vs_dequant_diff.max()
+    # Assess quantization quality
+    max_diff = diffs.max()
     if max_diff < 0.1:
-        print(f"Quantization quality is good (max diff: {max_diff:.6f})")
+        print("Quantization quality: Excellent")
     elif max_diff < 1.0:
-        print(f"Quantization quality is acceptable (max diff: {max_diff:.6f})")
+        print("Quantization quality: Acceptable")
     else:
-        print(f"Quantization quality is poor (max diff: {max_diff:.6f})")
-
+        print("Quantization quality: Poor")
 
 if __name__ == "__main__":
     main()
