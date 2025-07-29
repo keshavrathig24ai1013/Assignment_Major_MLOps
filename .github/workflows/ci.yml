@@ -1,62 +1,125 @@
-name: CI Pipeline
+name: MLOps CI/CD Major Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: main
 
 jobs:
   test_suite:
     runs-on: ubuntu-latest
+    name: Run the Test Suite
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.8
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Run unit tests
-        run: |
-          pytest tests/
+    - name: Run tests
+      run: |
+        cd src && python -m pytest ../tests/ -v
 
   train_and_quantize:
     runs-on: ubuntu-latest
+    name: Train and Quantize
     needs: test_suite
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-        python-version: '3.8'
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Train and Quantize
-        run: |
-          python src/train.py
-          python src/quantize.py
+    - name: Create models directory
+      run: |
+        mkdir -p models
 
-  docker_build:
+    - name: Train model
+      run: |
+        cd src
+        python train.py
+
+    - name: Quantize model
+      run: |
+        cd src
+        python quantize.py
+
+    - name: Verify artifacts exist
+      run: |
+        echo "Contents of models directory:"
+        ls -la models/
+        echo "Current working directory:"
+        pwd
+        echo "All files in current directory:"
+        find . -name "*.joblib" -type f
+
+    - name: Upload model artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: model-artifacts
+        path: |
+          src/models/
+        retention-days: 30
+        if-no-files-found: error
+
+  build_and_test_container:
     runs-on: ubuntu-latest
+    name: Build and Test Docker Container
     needs: train_and_quantize
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
 
-      - name: Build Docker Image
-        run: docker build -t mlops-linear-regression .
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Run Docker Container
-        run: docker run --rm mlops-linear-regression
+    - name: Create models directory
+      run: |
+        mkdir -p models
+
+    - name: Download model artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: model-artifacts
+        path: models/
+
+    - name: Verify downloaded artifacts
+      run: |
+        echo "Downloaded artifacts:"
+        ls -la models/
+        echo "Checking for required model files:"
+        test -f models/linear_regression_model.joblib && echo "Main model is found" || echo "Main model is missing"
+        test -f models/unquant_params.joblib && echo "Unquant params are found" || echo "Unquant params are missing"
+        test -f models/quant_params.joblib && echo "Quant params are found" || echo "Quant params are missing"
+
+    - name: Build Docker image
+      run: |
+        docker build -t major-exam-mlops .
+
+    - name: Test Docker container
+      run: |
+        docker run --rm major-exam-mlops
