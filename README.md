@@ -101,6 +101,7 @@ Intercept error: 0.00000042
 | Mean Squared Error (MSE) | 0.5559       |
 | Quantized Model Size     | 0.9 KB       |
 
+```bash
 Inference Test (first 10 samples):
 
 Original predictions (sklearn): [0.71912284 1.76401657 2.70965883 2.83892593 2.60465725 2.01175367
@@ -122,7 +123,7 @@ Original vs dequant manual:     [1.69724930e-06 1.69119024e-06 1.75485833e-06 1.
  1.73872417e-06 1.68434987e-06 1.68467863e-06 1.67666992e-06
 
  1.75952921e-06 1.71352492e-06]
-
+```
 
 
 
@@ -134,7 +135,7 @@ To run inference on the trained model:
 - The workflow was executed via GitHub Actions on each push.
 
 ### Run the Prediction Script
-```bash```
+```bash
 python src/predict.py
 
 Loading trained model.
@@ -156,6 +157,7 @@ True: 1.98 | Predicted: 2.65 | Diff: 0.66
 True: 1.57 | Predicted: 2.17 | Diff: 0.59
 True: 3.40 | Predicted: 2.74 | Diff: 0.66
 True: 4.47 | Predicted: 3.92 | Diff: 0.55
+```
 
 ## 6. Below is the performance comparison table
 
