@@ -78,7 +78,7 @@ To optimize the model for deployment, **manual quantization** was applied to red
 - Evaluated precision loss through a quality check and confirmed minimal error.
 
 ### Run Quantization
-```bash```
+```bash
 python src/quantize.py
 
 Loading trained model...
@@ -91,6 +91,7 @@ Intercept scale factor: 5.40
 Quantized parameters saved to models/quant_params.joblib
 Max coefficient error: 0.00000002
 Intercept error: 0.00000042
+```
 
 ## Evaluation Metrics
 
@@ -125,14 +126,14 @@ Original vs dequant manual:     [1.69724930e-06 1.69119024e-06 1.75485833e-06 1.
 
 
 
-## 🐳 Step 5: Inference & Docker Integration
+## Step 5: Inference & Docker Integration
 
 To run inference on the trained model:
 - A `predict.py` script was created in the `src/` folder.
 - A `Dockerfile` was added to containerize the complete pipeline.
 - The workflow was executed via GitHub Actions on each push.
 
-### ▶️ Run the Prediction Script
+### Run the Prediction Script
 ```bash```
 python src/predict.py
 
