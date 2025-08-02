@@ -54,9 +54,7 @@ All components are managed within a single `main` branch.
 
 ### Running the Tests
 Run the following command from the project root:
-```bash
 python tests/test_train.py
-
 rootdir: /Documents/Github/Major_Exam_MLOps
 collected 5 items
 
@@ -65,6 +63,7 @@ tests/test_train.py::TestTraining::test_model_creation PASSED     [ 40%]
 tests/test_train.py::TestTraining::test_model_training PASSED     [ 60%]
 tests/test_train.py::TestTraining::test_model_performance PASSED  [ 80%]
 tests/test_train.py::TestTraining::test_model_save_load PASSED    [100%]
+
 
 ========================= 5 passed in 0.28s =========================
 
@@ -79,7 +78,7 @@ To optimize the model for deployment, **manual quantization** was applied to red
 - Evaluated precision loss through a quality check and confirmed minimal error.
 
 ### Run Quantization
-```bash
+```bash```
 python src/quantize.py
 
 Loading trained model...
@@ -134,7 +133,7 @@ To run inference on the trained model:
 - The workflow was executed via GitHub Actions on each push.
 
 ### ▶️ Run the Prediction Script
-```bash
+```bash```
 python src/predict.py
 
 Loading trained model.
